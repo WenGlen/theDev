@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "theDev backend with Google Sheet",
   "type": "module",
-  "main": "app.js",
+  "main": "api/app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js"
+    "start": "node api/app.js",
+    "dev": "nodemon api/app.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
