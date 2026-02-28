@@ -317,6 +317,11 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "Backend running" });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Backend running on http://127.0.0.1:${PORT}`);
-});
+// 僅在本機開發時 listen；Vercel 會直接使用 export default app
+if (!process.env.VERCEL) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Backend running on http://127.0.0.1:${PORT}`);
+  });
+}
+
+export default app;
