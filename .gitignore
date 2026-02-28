@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.local
+.mds/
+*.log
+.DS_Store
+*-credentials*.json
+*service*account*.json
+google-*.json
