@@ -184,29 +184,38 @@ const REPORT_BLOCKS = ["選單", "UX", "戰鬥", "設定", "商店", "主畫面"
 const nowString = () =>
   new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
 
-/** 若 theDev 分頁第一列為空，先寫入標題列 */
-const ensureTheDevHeader = async () => {
+/** 將專案名轉成安全的分頁名稱（Google Sheet 分頁不可含 : \ / ? * [ ]） */
+const toSheetTabName = (name) => {
+  if (!name || typeof name !== "string") return "theDev";
+  const safe = name.replace(/[\\/:*?\[\]]/g, "_").trim().slice(0, 100);
+  return safe || "theDev";
+};
+
+/** 若指定分頁第一列為空，先寫入標題列 */
+const ensureHeader = async (sheetName) => {
+  const tab = toSheetTabName(sheetName);
   const existing = await sheetsClient.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: "'theDev'!A1:E1",
+    range: `'${tab}'!A1:E1`,
   });
   const rows = existing.data.values || [];
   if (rows.length === 0 || !rows[0] || !rows[0][0]) {
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: "'theDev'!A1:E1",
+      range: `'${tab}'!A1:E1`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [FEEDBACK_HEADERS] },
     });
   }
 };
 
-/** 寫入一筆回饋到 theDev 分頁（必要時先寫入標題） */
-const appendFeedbackToSheet = async (row) => {
-  await ensureTheDevHeader();
+/** 寫入一筆回饋到指定分頁（必要時先寫入標題） */
+const appendFeedbackToSheet = async (row, sheetName = "theDev") => {
+  const tab = toSheetTabName(sheetName);
+  await ensureHeader(tab);
   await sheetsClient.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: "'theDev'!A:E",
+    range: `'${tab}'!A:E`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [row] },
@@ -241,7 +250,7 @@ const feedbackToRow = (fb) => [
   String(fb.開發版本號 ?? ""),
 ];
 
-// 寫入一筆模擬回饋的共用邏輯
+// 寫入一筆模擬回饋的共用邏輯（固定寫入 theDev 分頁）
 async function handleMockFeedback(req, res) {
   try {
     if (!SHEET_ID) {
@@ -249,7 +258,7 @@ async function handleMockFeedback(req, res) {
     }
     const mock = createMockFeedback();
     const row = feedbackToRow(mock);
-    await appendFeedbackToSheet(row);
+    await appendFeedbackToSheet(row, "theDev");
     res.json({ success: true, message: "已寫入模擬回饋到 theDev 分頁", data: mock });
   } catch (err) {
     console.error("寫入模擬回饋失敗:", err);
@@ -265,13 +274,14 @@ app.get("/api/feedback/mock", handleMockFeedback);
 // POST /api/feedback/mock
 app.post("/api/feedback/mock", handleMockFeedback);
 
-// POST /api/feedback — 提交一筆回饋（回報時間由後端產生）
+// POST /api/feedback — 提交一筆回饋（回報時間由後端產生；依 專案 寫入對應分頁）
 app.post("/api/feedback", async (req, res) => {
   try {
     if (!SHEET_ID) {
       return res.status(500).json({ error: "SHEET_ID 未設定" });
     }
-    const { 回報類型, 回報區塊, 回報內容, 開發版本號 } = req.body;
+    const { 專案, 回報類型, 回報區塊, 回報內容, 開發版本號 } = req.body;
+    const sheetName = toSheetTabName(專案);
     const feedback = {
       回報時間: nowString(),
       回報類型: String(回報類型 ?? ""),
@@ -280,24 +290,25 @@ app.post("/api/feedback", async (req, res) => {
       開發版本號: String(開發版本號 ?? ""),
     };
     const row = feedbackToRow(feedback);
-    await appendFeedbackToSheet(row);
-    res.json({ success: true, message: "回饋已寫入 theDev 分頁", data: feedback });
+    await appendFeedbackToSheet(row, sheetName);
+    res.json({ success: true, message: `回饋已寫入分頁「${sheetName}」`, data: feedback });
   } catch (err) {
     console.error("寫入回饋失敗:", err);
     res.status(500).json({
-      error: "寫入 theDev 分頁失敗",
-      details: err.message || "請確認試算表已有「theDev」分頁並已共用給服務帳號",
+      error: "寫入分頁失敗",
+      details: err.message || "請確認試算表已有該分頁並已共用給服務帳號",
     });
   }
 });
 
-// GET /api/feedback — 讀取 theDev 分頁回饋列表（第一列為標題）
+// GET /api/feedback — 讀取指定專案分頁回饋列表（query: 專案，預設 theDev）
 app.get("/api/feedback", async (req, res) => {
   try {
     if (!SHEET_ID) {
       return res.status(500).json({ error: "SHEET_ID 未設定" });
     }
-    const raw = await readSheet("theDev!A1:E999");
+    const sheetName = toSheetTabName(req.query.專案 ?? req.query.project);
+    const raw = await readSheet(`'${sheetName}'!A1:E999`);
     if (!raw || raw.length < 1) return res.json([]);
     const headers = raw[0];
     const rows = raw.slice(1).map((row) => {
