@@ -74,8 +74,6 @@ app.get("/", (req, res) => {
       feedback: "/api/feedback",
       "feedback (submit)": "/api/feedback",
       "feedback (mock)": "/api/feedback/mock",
-      courses: "/api/courses",
-      booking: "/api/booking",
     },
   });
 });
