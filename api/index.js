@@ -66,12 +66,38 @@ const readSheet = async (range) => {
 app.get("/", (req, res) => {
   res.json({
     message: "theDev Backend API",
-    docs: {
-      health: "/api/health",
-      feedback: "/api/feedback",
-      "feedback (submit)": "/api/feedback",
-      "feedback (mock)": "/api/feedback/mock",
-    },
+    routes: [
+      {
+        method: "GET",
+        path: "/api/health",
+        description: "健康檢查",
+      },
+      {
+        method: "GET",
+        path: "/api/feedback",
+        description: "讀取指定專案的回饋列表",
+        params: { query: { 專案: "專案名稱（預設 theDev）" } },
+      },
+      {
+        method: "POST",
+        path: "/api/feedback",
+        description: "新增一筆回饋",
+        params: {
+          body: {
+            專案: "專案名稱",
+            回報類型: `${REPORT_TYPES.join(" | ")}`,
+            回報區塊: `${REPORT_BLOCKS.join(" | ")}`,
+            回報內容: "詳細描述",
+            開發版本號: "如 v0.1.0",
+          },
+        },
+      },
+      {
+        method: "GET / POST",
+        path: "/api/feedback/mock",
+        description: "寫入一筆隨機模擬回饋到 theDev 分頁（測試用）",
+      },
+    ],
   });
 });
 
